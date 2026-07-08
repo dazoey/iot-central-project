@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    container_name: iot_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: rootpassword
+      POSTGRES_DB: iot_central_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: iot_mqtt_broker
+    restart: unless-stopped
+    ports:
+      - "1883:1883" # Port MQTT standar
+      - "9001:9001" # Port MQTT over WebSockets (untuk frontend)
+    volumes:
+      - ./infrastructure/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+
+  redis:
+    image: redis:7-alpine
+    container_name: iot_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  pg_data:
+  mosquitto_data:
+  mosquitto_log:
+  redis_data:

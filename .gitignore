@@ -1,0 +1,32 @@
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Node.js
+node_modules/
+dist/
+build/
+npm-debug.log
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.pytest_cache/
+
+# C++
+*.o
+*.out
+*.exe
+build/
+bin/
+CMakeCache.txt
+CMakeFiles/
+
+# Docker & Infrastructure
+infrastructure/postgres/data/
+infrastructure/mosquitto/data/
+infrastructure/mosquitto/log/

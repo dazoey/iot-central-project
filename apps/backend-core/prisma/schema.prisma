@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model control_logs {
+  id          Int       @id @default(autoincrement())
+  device_id   Int?
+  command     String    @db.VarChar(100)
+  status      String    @db.VarChar(20)
+  executed_by Int?
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+  devices     devices?  @relation(fields: [device_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users       users?    @relation(fields: [executed_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model devices {
+  id             Int            @id @default(autoincrement())
+  device_name    String         @db.VarChar(100)
+  protocol       String         @db.VarChar(20)
+  dev_eui        String?        @unique @db.VarChar(16)
+  mqtt_client_id String?        @unique @db.VarChar(50)
+  status         String?        @default("offline") @db.VarChar(20)
+  created_at     DateTime?      @default(now()) @db.Timestamp(6)
+  control_logs   control_logs[]
+  sensors        sensors[]
+}
+
+model sensors {
+  id             Int              @id @default(autoincrement())
+  device_id      Int?
+  sensor_name    String           @db.VarChar(50)
+  sensor_type    String           @db.VarChar(50)
+  unit           String           @db.VarChar(10)
+  devices        devices?         @relation(fields: [device_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  telemetry_data telemetry_data[]
+}
+
+model telemetry_data {
+  time      DateTime @db.Timestamptz(6)
+  sensor_id Int
+  value     Float
+  sensors   sensors  @relation(fields: [sensor_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([time, sensor_id])
+  @@index([time(sort: Desc)])
+}
+
+model users {
+  id            Int            @id @default(autoincrement())
+  name          String         @db.VarChar(100)
+  email         String         @unique @db.VarChar(100)
+  password_hash String         @db.VarChar(255)
+  role          String?        @default("operator") @db.VarChar(20)
+  created_at    DateTime?      @default(now()) @db.Timestamp(6)
+  control_logs  control_logs[]
+}
