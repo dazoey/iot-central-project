@@ -1,4 +1,3 @@
--- 1. Tabel Users
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -8,7 +7,6 @@ CREATE TABLE users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. Tabel Devices
 CREATE TABLE devices (
     id SERIAL PRIMARY KEY,
     device_name VARCHAR(100) NOT NULL,
@@ -19,7 +17,6 @@ CREATE TABLE devices (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. Tabel Sensors
 CREATE TABLE sensors (
     id SERIAL PRIMARY KEY,
     device_id INT REFERENCES devices(id) ON DELETE CASCADE,
@@ -28,7 +25,6 @@ CREATE TABLE sensors (
     unit VARCHAR(10) NOT NULL
 );
 
--- 4. Tabel Telemetry Data (Time-Series)
 CREATE TABLE telemetry_data (
     time TIMESTAMPTZ NOT NULL,
     sensor_id INT REFERENCES sensors(id) ON DELETE CASCADE,
@@ -36,7 +32,6 @@ CREATE TABLE telemetry_data (
 );
 SELECT create_hypertable('telemetry_data', 'time');
 
--- 5. Tabel Control Logs
 CREATE TABLE control_logs (
     id SERIAL PRIMARY KEY,
     device_id INT REFERENCES devices(id) ON DELETE CASCADE,
