@@ -190,11 +190,42 @@ const getDeviceTelemetry = async (req, res) => {
     }
 };
 
+// PUT /api/v1/devices/:id/sensors/:sensorId (Update sensor)
+const updateSensor = async (req, res) => {
+    try {
+        const sensorId = parseInt(req.params.sensorId);
+        const { sensor_name, sensor_type, unit } = req.body;
+
+        const updatedSensor = await prisma.sensors.update({
+            where: { id: sensorId },
+            data: {
+                ...(sensor_name && { sensor_name }),
+                ...(sensor_type && { sensor_type }),
+                ...(unit && { unit })
+            }
+        });
+
+        console.log(`[INFO] Sensor ID ${sensorId} diperbarui`);
+        res.json(updatedSensor);
+    } catch (error) {
+        console.error('[ERROR] updateSensor:', error);
+        if (error.code === 'P2025') {
+            return res.status(404).json({ error: 'Sensor tidak ditemukan' });
+        }
+        res.status(500).json({ error: error.message });
+    }
+};
+
 // POST /api/v1/devices/:id/control (Kirim perintah kontrol MQTT)
 const sendCommand = async (req, res) => {
     try {
         const deviceId = parseInt(req.params.id);
         const { command, parameters } = req.body;
+
+        if (!command) {
+            return res.status(400).json({ error: 'command wajib diisi' });
+        }
+
         const mqttClient = require('../config/mqtt');
 
         const device = await prisma.devices.findUnique({
@@ -259,6 +290,7 @@ module.exports = {
     updateDevice,
     deleteDevice,
     addSensorToDevice,
+    updateSensor,
     deleteSensor,
     getDeviceTelemetry,
     sendCommand

@@ -7,6 +7,7 @@ const {
     updateDevice,
     deleteDevice,
     addSensorToDevice,
+    updateSensor,
     deleteSensor,
     getDeviceTelemetry,
     sendCommand
@@ -21,6 +22,7 @@ router.delete('/:id', deleteDevice);
 
 // Sensor Routes
 router.post('/:id/sensors', addSensorToDevice);
+router.put('/:id/sensors/:sensorId', updateSensor);
 router.delete('/:id/sensors/:sensorId', deleteSensor);
 
 // Telemetry & Control Routes
