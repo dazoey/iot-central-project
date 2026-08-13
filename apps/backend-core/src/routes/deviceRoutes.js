@@ -1,9 +1,30 @@
 const express = require('express');
 const router = express.Router();
-const { getAllDevices, getDeviceTelemetry, sendCommand } = require('../controllers/deviceController');
+const {
+    getAllDevices,
+    getDeviceById,
+    createDevice,
+    updateDevice,
+    deleteDevice,
+    addSensorToDevice,
+    deleteSensor,
+    getDeviceTelemetry,
+    sendCommand
+} = require('../controllers/deviceController');
 
+// Device Routes
 router.get('/', getAllDevices);
+router.get('/:id', getDeviceById);
+router.post('/', createDevice);
+router.put('/:id', updateDevice);
+router.delete('/:id', deleteDevice);
+
+// Sensor Routes
+router.post('/:id/sensors', addSensorToDevice);
+router.delete('/:id/sensors/:sensorId', deleteSensor);
+
+// Telemetry & Control Routes
 router.get('/:id/telemetry', getDeviceTelemetry);
-router.post('/:id/control', sendCommand); // Route untuk kontrol perangkat
+router.post('/:id/control', sendCommand);
 
 module.exports = router;

@@ -32,11 +32,11 @@ const handleIncomingMessage = async (topic, message) => {
                 });
                 console.log(`[INFO] Tersimpan di DB: ${sensor.sensor_name} = ${item.value} ${sensor.unit}`);
 
-                // Emit event real-time ke semua client WebSocket yang terhubung
+                // Emit event real-time ke Socket.IO
                 try {
                     const { getIO } = require('../config/socket');
                     const io = getIO();
-                    io.emit('realtime-telemetry', {
+                    const telemetryEvent = {
                         device_id: device.id,
                         client_id: device.mqtt_client_id,
                         device_name: device.device_name,
@@ -46,9 +46,14 @@ const handleIncomingMessage = async (topic, message) => {
                         value: item.value,
                         unit: sensor.unit,
                         time: telemetryRecord.time
-                    });
+                    };
+
+                    // Broadcast ke semua client (Global Feed)
+                    io.emit('realtime-telemetry', telemetryEvent);
+
+                    // Broadcast khusus ke room device (Device Room Feed)
+                    io.to(`device_${device.id}`).emit('device-telemetry', telemetryEvent);
                 } catch (socketErr) {
-                    // Jika Socket.IO belum siap, log warning tanpa menghentikan proses DB
                     console.log('[WARN] Socket.IO emit skipped:', socketErr.message);
                 }
             } else {
