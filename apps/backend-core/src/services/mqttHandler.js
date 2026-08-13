@@ -23,14 +23,34 @@ const handleIncomingMessage = async (topic, message) => {
             });
 
             if (sensor) {
-                await prisma.telemetry_data.create({
+                const telemetryRecord = await prisma.telemetry_data.create({
                     data: {
                         time: payload.timestamp ? new Date(payload.timestamp) : new Date(),
                         sensor_id: sensor.id,
                         value: item.value
                     }
                 });
-                console.log(`Tersimpan di DB: ${sensor.sensor_name} = ${item.value} ${sensor.unit}`);
+                console.log(`[INFO] Tersimpan di DB: ${sensor.sensor_name} = ${item.value} ${sensor.unit}`);
+
+                // Emit event real-time ke semua client WebSocket yang terhubung
+                try {
+                    const { getIO } = require('../config/socket');
+                    const io = getIO();
+                    io.emit('realtime-telemetry', {
+                        device_id: device.id,
+                        client_id: device.mqtt_client_id,
+                        device_name: device.device_name,
+                        sensor_id: sensor.id,
+                        sensor_name: sensor.sensor_name,
+                        sensor_type: sensor.sensor_type,
+                        value: item.value,
+                        unit: sensor.unit,
+                        time: telemetryRecord.time
+                    });
+                } catch (socketErr) {
+                    // Jika Socket.IO belum siap, log warning tanpa menghentikan proses DB
+                    console.log('[WARN] Socket.IO emit skipped:', socketErr.message);
+                }
             } else {
                 console.log(`Sensor tipe '${item.sensor_type}' tidak ditemukan pada perangkat ini.`);
             }
