@@ -32,7 +32,7 @@ class AnomalyCheckResponse(BaseModel):
     is_anomaly: bool
     method_used: str
     details: dict
-    ai_recommendation: Optional[str] = None
+    ai_recommendation: Optional[dict] = None
 
 @app.get("/")
 def read_root():
