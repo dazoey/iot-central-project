@@ -32,7 +32,27 @@ const handleIncomingMessage = async (topic, message) => {
                 });
                 console.log(`[INFO] Tersimpan di DB: ${sensor.sensor_name} = ${item.value} ${sensor.unit}`);
 
-                // Emit event real-time ke Socket.IO
+                // 1. Panggil ML Service dari Backend Core (Internal Microservice Communication)
+                let aiRecommendation = null;
+                try {
+                    const axios = require('axios');
+                    const mlRes = await axios.post('http://localhost:8000/api/v1/ml/detect-anomaly', {
+                        sensor_id: sensor.id,
+                        device_name: device.device_name,
+                        sensor_name: sensor.sensor_name,
+                        value: item.value,
+                        unit: sensor.unit
+                    }, { timeout: 3000 });
+
+                    if (mlRes.data && mlRes.data.is_anomaly) {
+                        console.log(`[ALERT] ML Service mendeteksi anomali pada ${device.device_name}!`);
+                        aiRecommendation = mlRes.data.ai_recommendation;
+                    }
+                } catch (mlErr) {
+                    // Jika ML Service sedang offline, backend tetap berjalan lancar
+                }
+
+                // 2. Emit event real-time ke Socket.IO (Frontend menerima data telemetri + indikator anomali + AI Advisor dari backend)
                 try {
                     const { getIO } = require('../config/socket');
                     const io = getIO();
@@ -45,13 +65,13 @@ const handleIncomingMessage = async (topic, message) => {
                         sensor_type: sensor.sensor_type,
                         value: item.value,
                         unit: sensor.unit,
-                        time: telemetryRecord.time
+                        time: telemetryRecord.time,
+                        is_anomaly: !!aiRecommendation,
+                        ai_recommendation: aiRecommendation
                     };
 
-                    // Broadcast ke semua client (Global Feed)
+                    // Broadcast ke semua client via Backend Socket.IO
                     io.emit('realtime-telemetry', telemetryEvent);
-
-                    // Broadcast khusus ke room device (Device Room Feed)
                     io.to(`device_${device.id}`).emit('device-telemetry', telemetryEvent);
                 } catch (socketErr) {
                     console.log('[WARN] Socket.IO emit skipped:', socketErr.message);
