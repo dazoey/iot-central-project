@@ -8,6 +8,7 @@ class TelemetryForecaster(AbstractBaseModel):
     Features:
     - N-step future value projection
     - Time-to-Threshold-Violation (TTV) estimation
+    - Prediction Confidence Intervals (Upper & Lower Bounds, 95% CI)
     """
     def __init__(self, alpha: float = 0.3, beta: float = 0.1):
         self.alpha = alpha
@@ -20,11 +21,13 @@ class TelemetryForecaster(AbstractBaseModel):
         self, 
         history: List[float], 
         steps_ahead: int = 5, 
-        critical_threshold: Optional[float] = None
+        critical_threshold: Optional[float] = None,
+        confidence_level: float = 0.95
     ) -> Dict[str, Any]:
         if not history or len(history) < 3:
             return {
                 "forecast_values": [],
+                "confidence_intervals": [],
                 "trend_direction": "unknown",
                 "message": "Data historis tidak cukup untuk membuat prediksi (minimal 3 data point)"
             }
@@ -33,21 +36,50 @@ class TelemetryForecaster(AbstractBaseModel):
         data = list(reversed(history))
         n = len(data)
 
-        # Inisialisasi Holt's Linear Trend
+        # Inisialisasi Holt's Linear Trend & Error Tracking
         level = data[0]
         trend = data[1] - data[0]
+        residuals = []
 
         for i in range(1, n):
             val = data[i]
+            pred_in_sample = level + trend
+            residuals.append(val - pred_in_sample)
+
             last_level = level
             level = self.alpha * val + (1 - self.alpha) * (level + trend)
             trend = self.beta * (level - last_level) + (1 - self.beta) * trend
 
-        # Proyeksi ke depan N langkah
+        # Standar Deviasi Residual Errors (Root Mean Squared Error / Residual Std)
+        residual_std = float(np.std(residuals)) if len(residuals) > 1 else 0.5
+        if residual_std == 0:
+            residual_std = 0.1
+
+        # Z-factor untuk 95% Confidence Interval (1.96)
+        z_factor = 1.96 if confidence_level == 0.95 else 1.645
+
+        # Proyeksi ke depan N langkah beserta Confidence Intervals (Upper & Lower Bounds)
         forecasts = []
+        confidence_intervals = []
+
         for h in range(1, steps_ahead + 1):
             pred_val = level + (h * trend)
-            forecasts.append(round(float(pred_val), 2))
+            
+            # Margin of Error meningkat seiring makin jauh langkah proyeksi h (fanning out effect)
+            margin_of_error = z_factor * residual_std * np.sqrt(h)
+
+            upper_bound = round(float(pred_val + margin_of_error), 2)
+            lower_bound = round(float(pred_val - margin_of_error), 2)
+            pred_rounded = round(float(pred_val), 2)
+
+            forecasts.append(pred_rounded)
+            confidence_intervals.append({
+                "step": h,
+                "predicted_value": pred_rounded,
+                "lower_bound": lower_bound,
+                "upper_bound": upper_bound,
+                "margin_of_error": round(float(margin_of_error), 2)
+            })
 
         # Penentuan arah tren
         trend_direction = "stable"
@@ -101,6 +133,8 @@ class TelemetryForecaster(AbstractBaseModel):
 
         return {
             "forecast_values": forecasts,
+            "confidence_intervals": confidence_intervals,
+            "confidence_level": f"{int(confidence_level * 100)}%",
             "steps_ahead": steps_ahead,
             "trend_direction": trend_direction,
             "trend_velocity": round(float(trend), 4),
