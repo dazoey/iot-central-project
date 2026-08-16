@@ -11,7 +11,8 @@ const {
     deleteSensor,
     getDeviceTelemetry,
     sendCommand,
-    getAIAdvisorAnalysis
+    getAIAdvisorAnalysis,
+    getDeviceTelemetryForecast
 } = require('../controllers/deviceController');
 
 // Device Routes
@@ -26,9 +27,10 @@ router.post('/:id/sensors', addSensorToDevice);
 router.put('/:id/sensors/:sensorId', updateSensor);
 router.delete('/:id/sensors/:sensorId', deleteSensor);
 
-// Telemetry, Control, & AI Advisor Routes
+// Telemetry, Control, AI Advisor, & Forecasting Routes
 router.get('/:id/telemetry', getDeviceTelemetry);
 router.post('/:id/control', sendCommand);
 router.get('/:id/ai-advisor', getAIAdvisorAnalysis);
+router.get('/:id/sensors/:sensorId/forecast', getDeviceTelemetryForecast);
 
 module.exports = router;

@@ -340,6 +340,26 @@ const getAIAdvisorAnalysis = async (req, res) => {
     }
 };
 
+// GET /api/v1/devices/:id/sensors/:sensorId/forecast (Prediksi tren telemetri mendatang)
+const getDeviceTelemetryForecast = async (req, res) => {
+    try {
+        const sensorId = parseInt(req.params.sensorId);
+        const steps = parseInt(req.query.steps) || 5;
+
+        // Panggil ML Service
+        const axios = require('axios');
+        const mlRes = await axios.post('http://localhost:8000/api/v1/ml/predict-telemetry', {
+            sensor_id: sensorId,
+            steps_ahead: steps
+        }, { timeout: 4000 });
+
+        res.json(mlRes.data);
+    } catch (error) {
+        console.error('[ERROR] getDeviceTelemetryForecast:', error.message);
+        res.status(500).json({ error: 'Gagal mendapatkan prediksi telemetri' });
+    }
+};
+
 module.exports = {
     getAllDevices,
     getDeviceById,
@@ -351,5 +371,6 @@ module.exports = {
     deleteSensor,
     getDeviceTelemetry,
     sendCommand,
-    getAIAdvisorAnalysis
+    getAIAdvisorAnalysis,
+    getDeviceTelemetryForecast
 };
