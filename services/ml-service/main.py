@@ -96,12 +96,14 @@ def train_isolation_forest(sensor_id: int = Query(...)):
 class ForecastRequest(BaseModel):
     sensor_id: int
     steps_ahead: Optional[int] = 5
+    critical_threshold: Optional[float] = None
     history_values: Optional[List[float]] = []
 
 @app.post("/api/v1/ml/predict-telemetry")
 def predict_telemetry(req: ForecastRequest):
     """
-    Memprediksi tren & nilai telemetri sensor N langkah ke depan (Forecasting).
+    Memprediksi tren & nilai telemetri sensor N langkah ke depan (Forecasting)
+    serta menghitung Estimasi Waktu Mencapai Batas Kritis (TTV).
     """
     from models.forecaster import TelemetryForecaster
     forecaster = TelemetryForecaster()
@@ -111,7 +113,11 @@ def predict_telemetry(req: ForecastRequest):
         db_records = fetch_sensor_telemetry_history(req.sensor_id, limit=50)
         history = [r["value"] for r in db_records]
 
-    forecast_res = forecaster.predict(history, steps_ahead=req.steps_ahead)
+    forecast_res = forecaster.predict(
+        history=history, 
+        steps_ahead=req.steps_ahead,
+        critical_threshold=req.critical_threshold
+    )
     return forecast_res
 
 if __name__ == "__main__":

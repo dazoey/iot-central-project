@@ -340,17 +340,19 @@ const getAIAdvisorAnalysis = async (req, res) => {
     }
 };
 
-// GET /api/v1/devices/:id/sensors/:sensorId/forecast (Prediksi tren telemetri mendatang)
+// GET /api/v1/devices/:id/sensors/:sensorId/forecast (Prediksi tren telemetri mendatang + TTV)
 const getDeviceTelemetryForecast = async (req, res) => {
     try {
         const sensorId = parseInt(req.params.sensorId);
         const steps = parseInt(req.query.steps) || 5;
+        const threshold = req.query.threshold ? parseFloat(req.query.threshold) : null;
 
         // Panggil ML Service
         const axios = require('axios');
         const mlRes = await axios.post('http://localhost:8000/api/v1/ml/predict-telemetry', {
             sensor_id: sensorId,
-            steps_ahead: steps
+            steps_ahead: steps,
+            critical_threshold: threshold
         }, { timeout: 4000 });
 
         res.json(mlRes.data);

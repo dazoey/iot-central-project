@@ -1,11 +1,13 @@
 import numpy as np
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from models.base import AbstractBaseModel
 
 class TelemetryForecaster(AbstractBaseModel):
     """
     Time-Series Forecasting Model using Holt's Exponential Smoothing & Linear Trend Projection.
-    Predicts future N values based on historical telemetry trend & momentum.
+    Features:
+    - N-step future value projection
+    - Time-to-Threshold-Violation (TTV) estimation
     """
     def __init__(self, alpha: float = 0.3, beta: float = 0.1):
         self.alpha = alpha
@@ -14,11 +16,16 @@ class TelemetryForecaster(AbstractBaseModel):
     def train(self, data: List[float]) -> None:
         pass  # Online adaptive model
 
-    def predict(self, history: List[float], steps_ahead: int = 5) -> Dict[str, Any]:
+    def predict(
+        self, 
+        history: List[float], 
+        steps_ahead: int = 5, 
+        critical_threshold: Optional[float] = None
+    ) -> Dict[str, Any]:
         if not history or len(history) < 3:
             return {
                 "forecast_values": [],
-                "trend": "unknown",
+                "trend_direction": "unknown",
                 "message": "Data historis tidak cukup untuk membuat prediksi (minimal 3 data point)"
             }
 
@@ -49,10 +56,54 @@ class TelemetryForecaster(AbstractBaseModel):
         elif trend < -0.05:
             trend_direction = "decreasing"
 
+        # --- SUB-FITUR 1: Time-to-Threshold-Violation (TTV) ---
+        ttv_info = None
+        if critical_threshold is not None:
+            last_val = data[-1]
+            
+            # Kasus 1: Nilai saat ini SUDAH menembus batas kritis
+            if (trend >= 0 and last_val >= critical_threshold) or (trend < 0 and last_val <= critical_threshold):
+                ttv_info = {
+                    "is_violating": True,
+                    "will_violate": True,
+                    "estimated_steps_to_violation": 0,
+                    "critical_threshold": critical_threshold,
+                    "warning_message": f"Kritis: Nilai saat ini ({last_val}) sudah melampaui batas kritis ({critical_threshold})!"
+                }
+            # Kasus 2: Tren naik menuju batas atas kritis
+            elif trend > 0.001 and last_val < critical_threshold:
+                steps_needed = (critical_threshold - last_val) / trend
+                ttv_info = {
+                    "is_violating": False,
+                    "will_violate": True,
+                    "estimated_steps_to_violation": round(float(steps_needed), 1),
+                    "critical_threshold": critical_threshold,
+                    "warning_message": f"Peringatan: Diprediksi menembus batas kritis ({critical_threshold}) dalam ~{round(float(steps_needed), 1)} interval ke depan."
+                }
+            # Kasus 3: Tren turun menuju batas bawah kritis
+            elif trend < -0.001 and last_val > critical_threshold:
+                steps_needed = (last_val - critical_threshold) / abs(trend)
+                ttv_info = {
+                    "is_violating": False,
+                    "will_violate": True,
+                    "estimated_steps_to_violation": round(float(steps_needed), 1),
+                    "critical_threshold": critical_threshold,
+                    "warning_message": f"Peringatan: Diprediksi menembus batas bawah kritis ({critical_threshold}) dalam ~{round(float(steps_needed), 1)} interval ke depan."
+                }
+            else:
+                ttv_info = {
+                    "is_violating": False,
+                    "will_violate": False,
+                    "estimated_steps_to_violation": None,
+                    "critical_threshold": critical_threshold,
+                    "warning_message": "Aman: Tren stabil atau bergerak menjauhi batas kritis."
+                }
+
         return {
             "forecast_values": forecasts,
             "steps_ahead": steps_ahead,
             "trend_direction": trend_direction,
             "trend_velocity": round(float(trend), 4),
-            "last_known_value": round(float(data[-1]), 2)
+            "last_known_value": round(float(data[-1]), 2),
+            "threshold_violation_analysis": ttv_info
         }
