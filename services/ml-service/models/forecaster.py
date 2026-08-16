@@ -7,8 +7,9 @@ class TelemetryForecaster(AbstractBaseModel):
     Time-Series Forecasting Model using Holt's Exponential Smoothing & Linear Trend Projection.
     Features:
     - N-step future value projection
-    - Time-to-Threshold-Violation (TTV) estimation
+    - Time-to-Threshold-Violation (TTV) estimation (Dual-Threshold Support: Upper & Lower)
     - Prediction Confidence Intervals (Upper & Lower Bounds, 95% CI)
+    - Automatic Trend Velocity Normalization & Adaptive Alpha/Beta Tuning
     """
     def __init__(self, alpha: float = 0.3, beta: float = 0.1):
         self.alpha = alpha
@@ -22,6 +23,7 @@ class TelemetryForecaster(AbstractBaseModel):
         history: List[float], 
         steps_ahead: int = 5, 
         critical_threshold: Optional[float] = None,
+        lower_critical_threshold: Optional[float] = None,
         confidence_level: float = 0.95
     ) -> Dict[str, Any]:
         if not history or len(history) < 3:
@@ -36,6 +38,10 @@ class TelemetryForecaster(AbstractBaseModel):
         data = list(reversed(history))
         n = len(data)
 
+        # Adaptive Alpha & Beta Tuning berdasarkan ukuran histori
+        alpha = self.alpha if n >= 10 else 0.5
+        beta = self.beta if n >= 10 else 0.2
+
         # Inisialisasi Holt's Linear Trend & Error Tracking
         level = data[0]
         trend = data[1] - data[0]
@@ -47,16 +53,16 @@ class TelemetryForecaster(AbstractBaseModel):
             residuals.append(val - pred_in_sample)
 
             last_level = level
-            level = self.alpha * val + (1 - self.alpha) * (level + trend)
-            trend = self.beta * (level - last_level) + (1 - self.beta) * trend
+            level = alpha * val + (1 - alpha) * (level + trend)
+            trend = beta * (level - last_level) + (1 - beta) * trend
 
         # Standar Deviasi Residual Errors (Root Mean Squared Error / Residual Std)
         residual_std = float(np.std(residuals)) if len(residuals) > 1 else 0.5
         if residual_std == 0:
             residual_std = 0.1
 
-        # Z-factor untuk 95% Confidence Interval (1.96)
-        z_factor = 1.96 if confidence_level == 0.95 else 1.645
+        # Z-factor untuk 95% Confidence Interval (1.96) atau 90% (1.645)
+        z_factor = 1.96 if confidence_level >= 0.95 else 1.645
 
         # Proyeksi ke depan N langkah beserta Confidence Intervals (Upper & Lower Bounds)
         forecasts = []
@@ -81,54 +87,78 @@ class TelemetryForecaster(AbstractBaseModel):
                 "margin_of_error": round(float(margin_of_error), 2)
             })
 
-        # Penentuan arah tren
+        # Penentuan arah tren (Adaptive Thresholding)
         trend_direction = "stable"
-        if trend > 0.05:
+        std_history = float(np.std(data)) if len(data) > 1 else 1.0
+        trend_threshold = 0.02 * std_history if std_history > 0 else 0.05
+
+        if trend > trend_threshold:
             trend_direction = "increasing"
-        elif trend < -0.05:
+        elif trend < -trend_threshold:
             trend_direction = "decreasing"
 
-        # --- SUB-FITUR 1: Time-to-Threshold-Violation (TTV) ---
+        # --- SUB-FITUR 1: Time-to-Threshold-Violation (TTV) Dual-Threshold ---
         ttv_info = None
-        if critical_threshold is not None:
-            last_val = data[-1]
+        last_val = data[-1]
+
+        if critical_threshold is not None or lower_critical_threshold is not None:
+            violation_found = False
             
-            # Kasus 1: Nilai saat ini SUDAH menembus batas kritis
-            if (trend >= 0 and last_val >= critical_threshold) or (trend < 0 and last_val <= critical_threshold):
-                ttv_info = {
-                    "is_violating": True,
-                    "will_violate": True,
-                    "estimated_steps_to_violation": 0,
-                    "critical_threshold": critical_threshold,
-                    "warning_message": f"Kritis: Nilai saat ini ({last_val}) sudah melampaui batas kritis ({critical_threshold})!"
-                }
-            # Kasus 2: Tren naik menuju batas atas kritis
-            elif trend > 0.001 and last_val < critical_threshold:
-                steps_needed = (critical_threshold - last_val) / trend
-                ttv_info = {
-                    "is_violating": False,
-                    "will_violate": True,
-                    "estimated_steps_to_violation": round(float(steps_needed), 1),
-                    "critical_threshold": critical_threshold,
-                    "warning_message": f"Peringatan: Diprediksi menembus batas kritis ({critical_threshold}) dalam ~{round(float(steps_needed), 1)} interval ke depan."
-                }
-            # Kasus 3: Tren turun menuju batas bawah kritis
-            elif trend < -0.001 and last_val > critical_threshold:
-                steps_needed = (last_val - critical_threshold) / abs(trend)
-                ttv_info = {
-                    "is_violating": False,
-                    "will_violate": True,
-                    "estimated_steps_to_violation": round(float(steps_needed), 1),
-                    "critical_threshold": critical_threshold,
-                    "warning_message": f"Peringatan: Diprediksi menembus batas bawah kritis ({critical_threshold}) dalam ~{round(float(steps_needed), 1)} interval ke depan."
-                }
-            else:
+            # Pengecekan Batas Atas (Upper Critical Threshold)
+            if critical_threshold is not None:
+                if last_val >= critical_threshold:
+                    ttv_info = {
+                        "is_violating": True,
+                        "will_violate": True,
+                        "estimated_steps_to_violation": 0,
+                        "threshold_type": "upper",
+                        "critical_threshold": critical_threshold,
+                        "warning_message": f"Kritis: Nilai saat ini ({last_val}) sudah melampaui batas atas ({critical_threshold})!"
+                    }
+                    violation_found = True
+                elif trend > 0.0001:
+                    steps_needed = (critical_threshold - last_val) / trend
+                    ttv_info = {
+                        "is_violating": False,
+                        "will_violate": True,
+                        "estimated_steps_to_violation": round(float(steps_needed), 1),
+                        "threshold_type": "upper",
+                        "critical_threshold": critical_threshold,
+                        "warning_message": f"Peringatan: Diprediksi menembus batas atas ({critical_threshold}) dalam ~{round(float(steps_needed), 1)} interval."
+                    }
+                    violation_found = True
+
+            # Pengecekan Batas Bawah (Lower Critical Threshold) jika belum ada kelapuran batas atas
+            if not violation_found and lower_critical_threshold is not None:
+                if last_val <= lower_critical_threshold:
+                    ttv_info = {
+                        "is_violating": True,
+                        "will_violate": True,
+                        "estimated_steps_to_violation": 0,
+                        "threshold_type": "lower",
+                        "critical_threshold": lower_critical_threshold,
+                        "warning_message": f"Kritis: Nilai saat ini ({last_val}) sudah di bawah batas bawah ({lower_critical_threshold})!"
+                    }
+                    violation_found = True
+                elif trend < -0.0001:
+                    steps_needed = (last_val - lower_critical_threshold) / abs(trend)
+                    ttv_info = {
+                        "is_violating": False,
+                        "will_violate": True,
+                        "estimated_steps_to_violation": round(float(steps_needed), 1),
+                        "threshold_type": "lower",
+                        "critical_threshold": lower_critical_threshold,
+                        "warning_message": f"Peringatan: Diprediksi di bawah batas bawah ({lower_critical_threshold}) dalam ~{round(float(steps_needed), 1)} interval."
+                    }
+                    violation_found = True
+
+            if not violation_found:
                 ttv_info = {
                     "is_violating": False,
                     "will_violate": False,
                     "estimated_steps_to_violation": None,
-                    "critical_threshold": critical_threshold,
-                    "warning_message": "Aman: Tren stabil atau bergerak menjauhi batas kritis."
+                    "critical_threshold": critical_threshold or lower_critical_threshold,
+                    "warning_message": "Aman: Tren stabil atau berada di rentang normal."
                 }
 
         return {
