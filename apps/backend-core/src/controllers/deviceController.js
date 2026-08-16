@@ -346,13 +346,15 @@ const getDeviceTelemetryForecast = async (req, res) => {
         const sensorId = parseInt(req.params.sensorId);
         const steps = parseInt(req.query.steps) || 5;
         const threshold = req.query.threshold ? parseFloat(req.query.threshold) : null;
+        const lowerThreshold = req.query.lower_threshold ? parseFloat(req.query.lower_threshold) : null;
 
         // Panggil ML Service
         const axios = require('axios');
         const mlRes = await axios.post('http://localhost:8000/api/v1/ml/predict-telemetry', {
             sensor_id: sensorId,
             steps_ahead: steps,
-            critical_threshold: threshold
+            critical_threshold: threshold,
+            lower_critical_threshold: lowerThreshold
         }, { timeout: 4000 });
 
         res.json(mlRes.data);
