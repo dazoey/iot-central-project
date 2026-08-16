@@ -283,6 +283,63 @@ const sendCommand = async (req, res) => {
     }
 };
 
+// GET /api/v1/devices/:id/ai-advisor (Minta saran AI Advisor langsung dari Backend)
+const getAIAdvisorAnalysis = async (req, res) => {
+    try {
+        const deviceId = parseInt(req.params.id);
+        const { sensor_id } = req.query;
+
+        const device = await prisma.devices.findUnique({
+            where: { id: deviceId },
+            include: { sensors: true }
+        });
+
+        if (!device) {
+            return res.status(404).json({ error: 'Perangkat tidak ditemukan' });
+        }
+
+        // Cari sensor terkait atau ambil sensor pertama
+        const targetSensor = sensor_id 
+            ? device.sensors.find(s => s.id === parseInt(sensor_id))
+            : device.sensors[0];
+
+        if (!targetSensor) {
+            return res.status(404).json({ error: 'Sensor tidak ditemukan pada perangkat ini' });
+        }
+
+        // Ambil bacaan telemetri terakhir
+        const lastTelemetry = await prisma.telemetry_data.findFirst({
+            where: { sensor_id: targetSensor.id },
+            orderBy: { time: 'desc' }
+        });
+
+        const currentValue = lastTelemetry ? lastTelemetry.value : 0.0;
+
+        // Panggil ML Service
+        const axios = require('axios');
+        const mlRes = await axios.post('http://localhost:8000/api/v1/ml/detect-anomaly', {
+            sensor_id: targetSensor.id,
+            device_name: device.device_name,
+            sensor_name: targetSensor.sensor_name,
+            value: currentValue,
+            unit: targetSensor.unit
+        }, { timeout: 4000 });
+
+        res.json({
+            device_id: device.id,
+            device_name: device.device_name,
+            sensor_name: targetSensor.sensor_name,
+            current_value: currentValue,
+            unit: targetSensor.unit,
+            is_anomaly: mlRes.data.is_anomaly,
+            ai_recommendation: mlRes.data.ai_recommendation
+        });
+    } catch (error) {
+        console.error('[ERROR] getAIAdvisorAnalysis:', error.message);
+        res.status(500).json({ error: 'Gagal mendapatkan analisa AI Advisor' });
+    }
+};
+
 module.exports = {
     getAllDevices,
     getDeviceById,
@@ -293,5 +350,6 @@ module.exports = {
     updateSensor,
     deleteSensor,
     getDeviceTelemetry,
-    sendCommand
+    sendCommand,
+    getAIAdvisorAnalysis
 };
