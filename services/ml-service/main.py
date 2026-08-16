@@ -97,13 +97,14 @@ class ForecastRequest(BaseModel):
     sensor_id: int
     steps_ahead: Optional[int] = 5
     critical_threshold: Optional[float] = None
+    lower_critical_threshold: Optional[float] = None
     history_values: Optional[List[float]] = []
 
 @app.post("/api/v1/ml/predict-telemetry")
 def predict_telemetry(req: ForecastRequest):
     """
     Memprediksi tren & nilai telemetri sensor N langkah ke depan (Forecasting)
-    serta menghitung Estimasi Waktu Mencapai Batas Kritis (TTV).
+    serta menghitung Estimasi Waktu Mencapai Batas Kritis (TTV) & 95% Confidence Intervals.
     """
     from models.forecaster import TelemetryForecaster
     forecaster = TelemetryForecaster()
@@ -116,7 +117,8 @@ def predict_telemetry(req: ForecastRequest):
     forecast_res = forecaster.predict(
         history=history, 
         steps_ahead=req.steps_ahead,
-        critical_threshold=req.critical_threshold
+        critical_threshold=req.critical_threshold,
+        lower_critical_threshold=req.lower_critical_threshold
     )
     return forecast_res
 
