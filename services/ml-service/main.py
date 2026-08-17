@@ -122,5 +122,33 @@ def predict_telemetry(req: ForecastRequest):
     )
     return forecast_res
 
+class HealthEvaluationRequest(BaseModel):
+    sensor_id: int
+    recent_anomalies_count: Optional[int] = 0
+    normal_min: Optional[float] = None
+    normal_max: Optional[float] = None
+    history_values: Optional[List[float]] = []
+
+@app.post("/api/v1/ml/device-health")
+def evaluate_device_health(req: HealthEvaluationRequest):
+    """
+    Menghitung skor kesehatan perangkat / Device Health Index (0% - 100%).
+    """
+    from models.health_evaluator import DeviceHealthEvaluator
+    evaluator = DeviceHealthEvaluator()
+
+    history = req.history_values
+    if not history:
+        db_records = fetch_sensor_telemetry_history(req.sensor_id, limit=100)
+        history = [r["value"] for r in db_records]
+
+    health_res = evaluator.evaluate_health(
+        history_values=history,
+        recent_anomalies_count=req.recent_anomalies_count,
+        normal_min=req.normal_min,
+        normal_max=req.normal_max
+    )
+    return health_res
+
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=config.PORT, reload=True)
