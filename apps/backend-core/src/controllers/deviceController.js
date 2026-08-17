@@ -364,6 +364,28 @@ const getDeviceTelemetryForecast = async (req, res) => {
     }
 };
 
+// GET /api/v1/devices/:id/sensors/:sensorId/health (Evaluasi Indeks Kesehatan Perangkat)
+const getDeviceHealthIndex = async (req, res) => {
+    try {
+        const sensorId = parseInt(req.params.sensorId);
+        const minVal = req.query.min ? parseFloat(req.query.min) : null;
+        const maxVal = req.query.max ? parseFloat(req.query.max) : null;
+
+        // Panggil ML Service
+        const axios = require('axios');
+        const mlRes = await axios.post('http://localhost:8000/api/v1/ml/device-health', {
+            sensor_id: sensorId,
+            normal_min: minVal,
+            normal_max: maxVal
+        }, { timeout: 4000 });
+
+        res.json(mlRes.data);
+    } catch (error) {
+        console.error('[ERROR] getDeviceHealthIndex:', error.message);
+        res.status(500).json({ error: 'Gagal mengevaluasi kesehatan perangkat' });
+    }
+};
+
 module.exports = {
     getAllDevices,
     getDeviceById,
@@ -376,5 +398,6 @@ module.exports = {
     getDeviceTelemetry,
     sendCommand,
     getAIAdvisorAnalysis,
-    getDeviceTelemetryForecast
+    getDeviceTelemetryForecast,
+    getDeviceHealthIndex
 };
