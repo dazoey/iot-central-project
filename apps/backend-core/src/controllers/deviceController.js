@@ -411,6 +411,34 @@ const getDeviceHealthIndex = async (req, res) => {
     }
 };
 
+// GET /api/v1/devices/:id/sensors/:sensorId/rul (Estimasi Sisa Usia Pakai / RUL)
+const getDeviceRULPrediction = async (req, res) => {
+    try {
+        const sensorId = parseInt(req.params.sensorId);
+        const lifespanDays = req.query.lifespan_days ? parseFloat(req.query.lifespan_days) : 365.0;
+
+        // 1. Dapatkan dulu skor kesehatan saat ini
+        const axios = require('axios');
+        const healthRes = await axios.post('http://localhost:8000/api/v1/ml/device-health', {
+            sensor_id: sensorId
+        }, { timeout: 4000 });
+
+        const currentHealth = healthRes.data ? healthRes.data.health_score : 100.0;
+
+        // 2. Panggil RUL Predictor Engine
+        const mlRes = await axios.post('http://localhost:8000/api/v1/ml/predict-rul', {
+            sensor_id: sensorId,
+            current_health_score: currentHealth,
+            expected_lifespan_days: lifespanDays
+        }, { timeout: 4000 });
+
+        res.json(mlRes.data);
+    } catch (error) {
+        console.error('[ERROR] getDeviceRULPrediction:', error.message);
+        res.status(500).json({ error: 'Gagal memprediksi sisa usia pakai (RUL) perangkat' });
+    }
+};
+
 module.exports = {
     getAllDevices,
     getDeviceById,
@@ -424,5 +452,6 @@ module.exports = {
     sendCommand,
     getAIAdvisorAnalysis,
     getDeviceTelemetryForecast,
-    getDeviceHealthIndex
+    getDeviceHealthIndex,
+    getDeviceRULPrediction
 };
