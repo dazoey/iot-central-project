@@ -150,5 +150,30 @@ def evaluate_device_health(req: HealthEvaluationRequest):
     )
     return health_res
 
+class RULEvaluationRequest(BaseModel):
+    sensor_id: int
+    health_score_history: Optional[List[float]] = []
+    current_health_score: Optional[float] = 100.0
+    expected_lifespan_days: Optional[float] = 365.0
+    failure_threshold_score: Optional[float] = 20.0
+    interval_hours: Optional[float] = 24.0
+
+@app.post("/api/v1/ml/predict-rul")
+def predict_rul(req: RULEvaluationRequest):
+    """
+    Memprediksi Sisa Usia Pakai / Remaining Useful Life (RUL) perangkat dalam hari/jam.
+    """
+    from models.rul_predictor import RULPredictor
+    predictor = RULPredictor()
+
+    rul_res = predictor.estimate_rul(
+        health_score_history=req.health_score_history,
+        current_health_score=req.current_health_score,
+        expected_lifespan_days=req.expected_lifespan_days,
+        failure_threshold_score=req.failure_threshold_score,
+        interval_hours=req.interval_hours
+    )
+    return rul_res
+
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=config.PORT, reload=True)
