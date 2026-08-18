@@ -18,18 +18,31 @@ const getAllDevices = async (req, res) => {
     }
 };
 
+// Helper untuk menyelesaikan deviceId dari Integer ID maupun mqtt_client_id string
+const resolveDeviceId = async (paramId) => {
+    let deviceId = parseInt(paramId);
+    if (isNaN(deviceId)) {
+        const device = await prisma.devices.findUnique({
+            where: { mqtt_client_id: paramId }
+        });
+        if (!device) return null;
+        return device.id;
+    }
+    return deviceId;
+};
+
 // GET /api/v1/devices/:id (Detail 1 perangkat)
 const getDeviceById = async (req, res) => {
     try {
-        const deviceId = parseInt(req.params.id);
+        const deviceId = await resolveDeviceId(req.params.id);
+        if (!deviceId) {
+            return res.status(404).json({ error: 'Perangkat tidak ditemukan' });
+        }
+
         const device = await prisma.devices.findUnique({
             where: { id: deviceId },
             include: { sensors: true }
         });
-
-        if (!device) {
-            return res.status(404).json({ error: 'Perangkat tidak ditemukan' });
-        }
 
         res.json(device);
     } catch (error) {
@@ -174,8 +187,20 @@ const deleteSensor = async (req, res) => {
 // GET /api/v1/devices/:id/telemetry (Ambil data telemetri historis)
 const getDeviceTelemetry = async (req, res) => {
     try {
-        const deviceId = parseInt(req.params.id);
+        const paramId = req.params.id;
         const limit = parseInt(req.query.limit) || 50;
+
+        // Cari ID perangkat berdasarkan integer ID atau mqtt_client_id
+        let deviceId = parseInt(paramId);
+        if (isNaN(deviceId)) {
+            const device = await prisma.devices.findUnique({
+                where: { mqtt_client_id: paramId }
+            });
+            if (!device) {
+                return res.status(404).json({ error: `Perangkat '${paramId}' tidak ditemukan` });
+            }
+            deviceId = device.id;
+        }
 
         const telemetry = await prisma.telemetry_data.findMany({
             where: { sensors: { device_id: deviceId } },
