@@ -14,7 +14,8 @@ const {
     getAIAdvisorAnalysis,
     getDeviceTelemetryForecast,
     getDeviceHealthIndex,
-    getDeviceRULPrediction
+    getDeviceRULPrediction,
+    getDeviceMaintenanceSchedule
 } = require('../controllers/deviceController');
 
 // Device Routes
@@ -29,12 +30,13 @@ router.post('/:id/sensors', addSensorToDevice);
 router.put('/:id/sensors/:sensorId', updateSensor);
 router.delete('/:id/sensors/:sensorId', deleteSensor);
 
-// Telemetry, Control, AI Advisor, Forecasting, Health, & RUL Routes
+// Telemetry, Control, AI Advisor, Forecasting, Health, RUL, & Maintenance Routes
 router.get('/:id/telemetry', getDeviceTelemetry);
 router.post('/:id/control', sendCommand);
 router.get('/:id/ai-advisor', getAIAdvisorAnalysis);
 router.get('/:id/sensors/:sensorId/forecast', getDeviceTelemetryForecast);
 router.get('/:id/sensors/:sensorId/health', getDeviceHealthIndex);
 router.get('/:id/sensors/:sensorId/rul', getDeviceRULPrediction);
+router.get('/:id/sensors/:sensorId/maintenance-schedule', getDeviceMaintenanceSchedule);
 
 module.exports = router;
