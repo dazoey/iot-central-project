@@ -175,5 +175,32 @@ def predict_rul(req: RULEvaluationRequest):
     )
     return rul_res
 
+class MaintenanceScheduleRequest(BaseModel):
+    sensor_id: int
+    device_name: Optional[str] = "Device"
+    sensor_name: Optional[str] = "Sensor"
+    health_score: Optional[float] = 100.0
+    rul_days: Optional[float] = 365.0
+    recent_anomalies_count: Optional[int] = 0
+    trend_direction: Optional[str] = "stable"
+
+@app.post("/api/v1/ml/schedule-maintenance")
+def schedule_maintenance(req: MaintenanceScheduleRequest):
+    """
+    Menghasilkan rekomendasi jadwal pemeliharaan & Work Order teknis otomatis.
+    """
+    from models.maintenance_scheduler import MaintenanceScheduler
+    scheduler = MaintenanceScheduler()
+
+    schedule_res = scheduler.generate_recommendation(
+        health_score=req.health_score,
+        rul_days=req.rul_days,
+        recent_anomalies_count=req.recent_anomalies_count,
+        trend_direction=req.trend_direction,
+        device_name=req.device_name,
+        sensor_name=req.sensor_name
+    )
+    return schedule_res
+
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=config.PORT, reload=True)
