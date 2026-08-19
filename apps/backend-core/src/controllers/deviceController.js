@@ -439,6 +439,47 @@ const getDeviceRULPrediction = async (req, res) => {
     }
 };
 
+// GET /api/v1/devices/:id/sensors/:sensorId/maintenance-schedule (Penjadwalan Otomatis & Work Order)
+const getDeviceMaintenanceSchedule = async (req, res) => {
+    try {
+        const deviceId = parseInt(req.params.id);
+        const sensorId = parseInt(req.params.sensorId);
+
+        const axios = require('axios');
+
+        // 1. Ambil Health Index
+        const healthRes = await axios.post('http://localhost:8000/api/v1/ml/device-health', {
+            sensor_id: sensorId
+        }, { timeout: 4000 });
+
+        const currentHealth = healthRes.data ? healthRes.data.health_score : 100.0;
+        const anomaliesCount = healthRes.data && healthRes.data.metrics_breakdown 
+            ? healthRes.data.metrics_breakdown.anomaly_count_24h 
+            : 0;
+
+        // 2. Ambil RUL
+        const rulRes = await axios.post('http://localhost:8000/api/v1/ml/predict-rul', {
+            sensor_id: sensorId,
+            current_health_score: currentHealth
+        }, { timeout: 4000 });
+
+        const rulDays = rulRes.data ? rulRes.data.rul_days : 365.0;
+
+        // 3. Panggil Auto Maintenance Scheduler
+        const mlRes = await axios.post('http://localhost:8000/api/v1/ml/schedule-maintenance', {
+            sensor_id: sensorId,
+            health_score: currentHealth,
+            rul_days: rulDays,
+            recent_anomalies_count: anomaliesCount
+        }, { timeout: 4000 });
+
+        res.json(mlRes.data);
+    } catch (error) {
+        console.error('[ERROR] getDeviceMaintenanceSchedule:', error.message);
+        res.status(500).json({ error: 'Gagal mendapatkan penjadwalan pemeliharaan otomatis' });
+    }
+};
+
 module.exports = {
     getAllDevices,
     getDeviceById,
@@ -453,5 +494,6 @@ module.exports = {
     getAIAdvisorAnalysis,
     getDeviceTelemetryForecast,
     getDeviceHealthIndex,
-    getDeviceRULPrediction
+    getDeviceRULPrediction,
+    getDeviceMaintenanceSchedule
 };
