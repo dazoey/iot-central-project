@@ -6,9 +6,10 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <cstdlib>
 
-SocketServer::SocketServer(int udpPort) 
-    : m_udpPort(udpPort), m_socketFd(-1), m_isRunning(false) {}
+SocketServer::SocketServer(int udpPort, const std::string& backendUrl) 
+    : m_udpPort(udpPort), m_socketFd(-1), m_backendUrl(backendUrl), m_isRunning(false) {}
 
 SocketServer::~SocketServer() {
     stop();
@@ -21,6 +22,10 @@ bool SocketServer::start() {
         std::cerr << "[ERROR] Failed to create UDP socket" << std::endl;
         return false;
     }
+
+    // Set REUSEADDR option for fast socket restart
+    int opt = 1;
+    setsockopt(m_socketFd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
     // Bind Socket to Port
     sockaddr_in serverAddr{};
@@ -53,6 +58,13 @@ void SocketServer::stop() {
     }
 }
 
+bool SocketServer::forwardToBackend(const std::string& jsonPayload) {
+    // Forward decoded JSON telemetry over local curl command to Backend Core
+    std::string cmd = "curl -s -X POST -H 'Content-Type: application/json' -d '" + jsonPayload + "' " + m_backendUrl + " > /dev/null 2>&1 &";
+    int ret = std::system(cmd.c_str());
+    return (ret == 0);
+}
+
 void SocketServer::listenLoop() {
     uint8_t buffer[2048];
     sockaddr_in clientAddr{};
@@ -78,6 +90,9 @@ void SocketServer::listenLoop() {
             if (telemetry.isValid) {
                 std::string jsonStr = m_decoder.toJsonString(telemetry);
                 std::cout << "[UDP DECODED] " << jsonStr << std::endl;
+                
+                // Forward decoded payload to Backend Core
+                forwardToBackend(jsonStr);
             } else {
                 std::cerr << "[UDP DECODE ERROR] " << telemetry.errorMessage << std::endl;
             }
