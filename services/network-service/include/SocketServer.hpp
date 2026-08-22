@@ -8,7 +8,7 @@
 
 class SocketServer {
 public:
-    SocketServer(int udpPort = 8080);
+    SocketServer(int udpPort = 8080, const std::string& backendUrl = "http://localhost:3000");
     ~SocketServer();
 
     /**
@@ -22,13 +22,14 @@ public:
     void stop();
 
     /**
-     * Helper to send decoded JSON payload over HTTP to Backend Core (localhost:3000)
+     * Helper to forward decoded JSON telemetry directly to Backend Core / MQTT Broker
      */
     bool forwardToBackend(const std::string& jsonPayload);
 
 private:
     int m_udpPort;
     int m_socketFd;
+    std::string m_backendUrl;
     std::atomic<bool> m_isRunning;
     PayloadDecoder m_decoder;
 
