@@ -20,18 +20,24 @@ int main() {
         std::cerr << "[SELF-TEST ERROR] Decoding Failed: " << result.errorMessage << std::endl;
     }
 
-    // 2. Start UDP Socket Gateway Server on Port 8080
-    SocketServer udpServer(8080);
-    if (udpServer.start()) {
-        std::cout << "[INFO] UDP Gateway Active on Port 8080. Press Ctrl+C or kill to stop." << std::endl;
+    // 2. Start Dual UDP (8080) & TCP (8081) Socket Gateway Server
+    SocketServer gatewayServer(8080, 8081);
+    if (gatewayServer.start()) {
+        std::cout << "[INFO] Dual Gateway Active: UDP (Port 8080) | TCP (Port 8081)." << std::endl;
+        std::cout << "[INFO] Direct MQTT Publishing Target: Mosquitto (Port 1883)." << std::endl;
     } else {
-        std::cerr << "[FATAL] Failed to start UDP Socket Gateway!" << std::endl;
+        std::cerr << "[FATAL] Failed to start Dual Socket Gateway!" << std::endl;
         return 1;
     }
 
-    // Keep main thread alive for server loop
+    // Keep main thread alive & print metrics every 30 seconds
+    int loopCount = 0;
     while (true) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
+        loopCount++;
+        if (loopCount % 30 == 0) {
+            gatewayServer.printMetrics();
+        }
     }
 
     return 0;
