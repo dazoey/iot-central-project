@@ -101,8 +101,14 @@ void SocketServer::stop() {
 }
 
 bool SocketServer::publishToMqttBroker(const std::string& clientId, const std::string& jsonPayload) {
-    // Publish decoded JSON payload directly to Mosquitto MQTT Broker (devices/<client_id>/telemetry)
-    std::string topic = "devices/" + clientId + "/telemetry";
+    // Sanitasi payload agar tidak merusak shell command
+    std::string safeClientId = clientId;
+    for (char &c : safeClientId) {
+        if (!isalnum(c) && c != '_' && c != '-') c = '_';
+    }
+
+    // Command eksekusi aman via docker / mosquitto_pub
+    std::string topic = "devices/" + safeClientId + "/telemetry";
     std::string cmd = "docker exec iot_mqtt_broker mosquitto_pub -h " + m_mqttHost + " -t \"" + topic + "\" -m '" + jsonPayload + "' > /dev/null 2>&1 &";
     int ret = std::system(cmd.c_str());
     return (ret == 0);
@@ -169,6 +175,12 @@ void SocketServer::listenTcpLoop() {
 }
 
 void SocketServer::handleTcpClient(int clientSocket, std::string clientIp) {
+    // Set TCP Recv Timeout (3 detik) untuk mencegah socket menggantung
+    struct timeval tv;
+    tv.tv_sec = 3;
+    tv.tv_usec = 0;
+    setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv));
+
     uint8_t buffer[2048];
     ssize_t bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0);
 
