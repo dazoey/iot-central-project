@@ -18,17 +18,26 @@ const getAllDevices = async (req, res) => {
     }
 };
 
-// Helper untuk menyelesaikan deviceId dari Integer ID maupun mqtt_client_id string
+// Helper untuk menyelesaikan deviceId dari Integer ID, mqtt_client_id, maupun dev_eui string
 const resolveDeviceId = async (paramId) => {
-    let deviceId = parseInt(paramId);
-    if (isNaN(deviceId)) {
-        const device = await prisma.devices.findUnique({
-            where: { mqtt_client_id: paramId }
-        });
-        if (!device) return null;
-        return device.id;
+    // ID integer database kecil bernilai max 2,147,483,647 (maksimal 9-10 digit angka)
+    const isSmallDbInteger = /^\d{1,9}$/.test(paramId) && parseInt(paramId) <= 2147483647;
+
+    if (isSmallDbInteger) {
+        return parseInt(paramId);
     }
-    return deviceId;
+
+    // Jika berupa string client_id atau dev_eui hex (misal 16 digit DevEUI "0102030405060708")
+    const device = await prisma.devices.findFirst({
+        where: {
+            OR: [
+                { mqtt_client_id: paramId },
+                { dev_eui: paramId }
+            ]
+        }
+    });
+    if (!device) return null;
+    return device.id;
 };
 
 // GET /api/v1/devices/:id (Detail 1 perangkat)
@@ -187,19 +196,11 @@ const deleteSensor = async (req, res) => {
 // GET /api/v1/devices/:id/telemetry (Ambil data telemetri historis)
 const getDeviceTelemetry = async (req, res) => {
     try {
-        const paramId = req.params.id;
         const limit = parseInt(req.query.limit) || 50;
+        const deviceId = await resolveDeviceId(req.params.id);
 
-        // Cari ID perangkat berdasarkan integer ID atau mqtt_client_id
-        let deviceId = parseInt(paramId);
-        if (isNaN(deviceId)) {
-            const device = await prisma.devices.findUnique({
-                where: { mqtt_client_id: paramId }
-            });
-            if (!device) {
-                return res.status(404).json({ error: `Perangkat '${paramId}' tidak ditemukan` });
-            }
-            deviceId = device.id;
+        if (!deviceId) {
+            return res.status(404).json({ error: `Perangkat '${req.params.id}' tidak ditemukan` });
         }
 
         const telemetry = await prisma.telemetry_data.findMany({
