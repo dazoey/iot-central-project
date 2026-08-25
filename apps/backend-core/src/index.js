@@ -6,6 +6,7 @@ const cors = require('cors');
 const mqttClient = require('./config/mqtt');
 const { handleIncomingMessage } = require('./services/mqttHandler');
 const deviceRoutes = require('./routes/deviceRoutes');
+const loraRoutes = require('./routes/loraRoutes');
 const { initSocket } = require('./config/socket');
 
 const app = express();
@@ -34,8 +35,9 @@ app.get('/', (req, res) => {
     res.send('IoT Central API Running');
 });
 
-// Daftarkan route device
+// Daftarkan route device & lora
 app.use('/api/v1/devices', deviceRoutes);
+app.use('/api/v1/lora', loraRoutes);
 
 // start server HTTP + Socket.IO
 server.listen(PORT, () => {
