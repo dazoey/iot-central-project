@@ -1,0 +1,29 @@
+# ChirpStack Network Server & Application Server Configuration
+# Reference: ChirpStack v4 Configuration Schema
+
+[logging]
+  level="info"
+
+[postgresql]
+  dsn="postgres://postgres:postgres@iot_postgres:5432/chirpstack?sslmode=disable"
+  max_open_connections=10
+
+[redis]
+  url="redis://iot_redis:6379"
+
+[network]
+  net_id="000000"
+
+[api]
+  bind="0.0.0.0:8080"
+  secret="very_secret_jwt_key_for_chirpstack_api"
+
+[integration]
+  enabled=["mqtt"]
+
+  [integration.mqtt]
+    server="tcp://iot_mqtt_broker:1883"
+    json=true
+
+[user_interface]
+  enabled=true
