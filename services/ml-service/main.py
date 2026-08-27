@@ -7,6 +7,7 @@ from config import config
 from models.anomaly import ZScoreAnomalyDetector, IsolationForestAnomalyDetector
 from models.llm_advisor import LLMAdvisor
 from core.db import fetch_sensor_telemetry_history
+from core.scheduler import AutoRetrainingPipeline
 
 app = FastAPI(
     title=config.SERVICE_NAME,
@@ -14,10 +15,20 @@ app = FastAPI(
     description="Microservice Machine Learning & AI Diagnostics untuk IoT Central System"
 )
 
-# Inisialisasi Model ML & LLM Advisor
+# Inisialisasi Model ML, LLM Advisor, & Auto-Retraining Pipeline
 z_detector = ZScoreAnomalyDetector(threshold=config.ZSCORE_THRESHOLD)
 iso_detector = IsolationForestAnomalyDetector()
 llm_advisor = LLMAdvisor()
+retrain_pipeline = AutoRetrainingPipeline(iso_detector)
+
+@app.on_event("startup")
+def startup_event():
+    # Jalankan scheduler otomatis setiap 24 jam di latar belakang
+    retrain_pipeline.start_scheduler(interval_hours=24)
+
+@app.on_event("shutdown")
+def shutdown_event():
+    retrain_pipeline.stop_scheduler()
 
 # Pydantic Schemas
 class TelemetryCheckRequest(BaseModel):
@@ -92,6 +103,14 @@ def train_isolation_forest(sensor_id: int = Query(...)):
         "message": f"Isolation Forest berhasil dilatih untuk Sensor ID {sensor_id}",
         "data_points_used": len(values)
     }
+
+@app.post("/api/v1/ml/trigger-auto-retrain")
+def trigger_auto_retrain():
+    """
+    Pemicu manual untuk menjalankan siklus Auto-Retraining ML Pipeline secara instan.
+    """
+    retrain_pipeline.retrain_all_models()
+    return {"message": "Siklus Auto-Retraining ML Pipeline telah berhasil dipicu di latar belakang."}
 
 class ForecastRequest(BaseModel):
     sensor_id: int
