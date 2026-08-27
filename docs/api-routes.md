@@ -1,32 +1,33 @@
-# API Documentation & Postman Testing Guide
+# API Documentation and Testing Reference
 **IoT Central Management System**
 
-Panduan lengkap seluruh REST API Endpoints yang tersedia pada sistem ini untuk pengujian manual via Postman / cURL.
+Comprehensive list of all REST API Endpoints available in this system for manual testing via Postman or cURL.
 
 ---
 
-## 🟢 1. Backend Core Endpoints (Port 3000)
+## 1. Backend Core Endpoints (Port 3000)
 > **Base URL**: `http://localhost:3000`
 
-### A. Core & Device Management
+### A. Core and Device Management
 
 #### 1. Server Health / Root Check
 - **Method**: `GET`
 - **URL**: `http://localhost:3000/`
-- **Description**: Mengecek apakah Backend Core berjalan aktif.
+- **Description**: Verifies if the Backend Core service is active.
 
 #### 2. Get All Devices
 - **Method**: `GET`
 - **URL**: `http://localhost:3000/api/v1/devices`
-- **Description**: Mengambil semua daftar perangkat IoT beserta sensor-sensor yang terpasang.
+- **Description**: Retrieves all IoT devices along with their attached sensors.
 
-#### 3. Get Device by ID / Client ID
+#### 3. Get Device by ID or Client ID
 - **Method**: `GET`
 - **URL**: `http://localhost:3000/api/v1/devices/:id`
 - **Examples**:
   - `http://localhost:3000/api/v1/devices/2`
   - `http://localhost:3000/api/v1/devices/DEV_TEST_01`
-- **Description**: Mengambil detail 1 perangkat spesifik menggunakan ID angka DB atau Client ID String.
+  - `http://localhost:3000/api/v1/devices/0102030405060708`
+- **Description**: Retrieves details for a specific device using DB integer ID, Client ID string, or LoRaWAN DevEUI string.
 
 #### 4. Create New Device
 - **Method**: `POST`
@@ -35,7 +36,7 @@ Panduan lengkap seluruh REST API Endpoints yang tersedia pada sistem ini untuk p
 - **Body (JSON)**:
   ```json
   {
-    "device_name": "Sensor Tangki Air Utama",
+    "device_name": "Main Water Tank Sensor",
     "protocol": "MQTT",
     "mqtt_client_id": "ULTRASONIC_TANK_01"
   }
@@ -48,7 +49,7 @@ Panduan lengkap seluruh REST API Endpoints yang tersedia pada sistem ini untuk p
 - **Body (JSON)**:
   ```json
   {
-    "device_name": "Sensor Tangki Air Utama (Updated)",
+    "device_name": "Main Water Tank Sensor (Updated)",
     "status": "online"
   }
   ```
@@ -56,7 +57,7 @@ Panduan lengkap seluruh REST API Endpoints yang tersedia pada sistem ini untuk p
 #### 6. Delete Device
 - **Method**: `DELETE`
 - **URL**: `http://localhost:3000/api/v1/devices/:id`
-- **Description**: Menghapus perangkat beserta relasi sensornya.
+- **Description**: Deletes a device and all associated sensors.
 
 ---
 
@@ -69,7 +70,7 @@ Panduan lengkap seluruh REST API Endpoints yang tersedia pada sistem ini untuk p
 - **Body (JSON)**:
   ```json
   {
-    "sensor_name": "Sensor Ketinggian Air",
+    "sensor_name": "Water Level Sensor",
     "sensor_type": "distance",
     "unit": "cm"
   }
@@ -82,7 +83,7 @@ Panduan lengkap seluruh REST API Endpoints yang tersedia pada sistem ini untuk p
 - **Body (JSON)**:
   ```json
   {
-    "sensor_name": "Sensor Ketinggian Air Kalibrasi",
+    "sensor_name": "Calibrated Water Level Sensor",
     "unit": "cm"
   }
   ```
@@ -93,13 +94,11 @@ Panduan lengkap seluruh REST API Endpoints yang tersedia pada sistem ini untuk p
 
 ---
 
-### C. Telemetry, Control, & AI/ML Integrations
+### C. Telemetry, Remote Control, LoRaWAN, and AI/ML Integrations
 
 #### 10. Get Device Telemetry History
 - **Method**: `GET`
 - **URL**: `http://localhost:3000/api/v1/devices/:id/telemetry?limit=50`
-- **Examples**:
-  - `http://localhost:3000/api/v1/devices/DEV_TEST_01/telemetry?limit=20`
 
 #### 11. Send MQTT Control Command
 - **Method**: `POST`
@@ -113,48 +112,66 @@ Panduan lengkap seluruh REST API Endpoints yang tersedia pada sistem ini untuk p
   }
   ```
 
-#### 12. Query AI LLM Diagnostic Advisor
+#### 12. LoRaWAN ChirpStack Webhook Uplink Listener
+- **Method**: `POST`
+- **URL**: `http://localhost:3000/api/v1/lora/uplink`
+- **Headers**: `Content-Type: application/json`
+- **Body (JSON)**:
+  ```json
+  {
+    "deviceInfo": {
+      "devEui": "0102030405060708",
+      "deviceName": "LoRa Soil Moisture Sensor 01"
+    },
+    "object": {
+      "temperature": 27.5,
+      "humidity": 62.0
+    }
+  }
+  ```
+
+#### 13. Query AI LLM Diagnostic Advisor
 - **Method**: `GET`
 - **URL**: `http://localhost:3000/api/v1/devices/:id/ai-advisor`
-- **Description**: Mengambil diagnosa AI Gemini (problem & solution) untuk kondisi sensor terkini.
+- **Description**: Fetches Gemini AI diagnostics (`problem` and `solution`) for latest telemetry.
 
-#### 13. Telemetry Forecasting & Time-to-Threshold-Violation (TTV)
+#### 14. Telemetry Forecasting and Time-to-Threshold-Violation (TTV)
 - **Method**: `GET`
 - **URL**: `http://localhost:3000/api/v1/devices/:id/sensors/:sensorId/forecast?steps=5&threshold=85.0&lower_threshold=10.0`
-- **Description**: Memprediksi angka telemetri N langkah ke depan, 95% Confidence Intervals, dan estimasi waktu pelanggaran batas kritis.
+- **Description**: Predicts N steps ahead, 95% Confidence Intervals, and critical threshold violation time.
 
-#### 14. Device Health Index (DHI) Evaluation
+#### 15. Device Health Index (DHI) Evaluation
 - **Method**: `GET`
 - **URL**: `http://localhost:3000/api/v1/devices/:id/sensors/:sensorId/health?min=20.0&max=35.0`
-- **Description**: Mengevaluasi skor kesehatan perangkat (0% - 100%), status warna, dan rincian penalti.
+- **Description**: Evaluates overall device health score (0% - 100%), status color, and penalty breakdown.
 
-#### 15. Remaining Useful Life (RUL) Prediction
+#### 16. Remaining Useful Life (RUL) Prediction
 - **Method**: `GET`
 - **URL**: `http://localhost:3000/api/v1/devices/:id/sensors/:sensorId/rul?lifespan_days=365`
-- **Description**: Memprediksi sisa usia operasional perangkat dalam hari/jam sebelum mengalami kerusakan.
+- **Description**: Estimates remaining operational lifespan in days and hours before failure.
 
-#### 16. Auto Maintenance Schedule & Work Order
+#### 17. Auto Maintenance Schedule and Work Order Generator
 - **Method**: `GET`
 - **URL**: `http://localhost:3000/api/v1/devices/:id/sensors/:sensorId/maintenance-schedule`
-- **Description**: Menghasilkan rekomendasi tanggal perawatan dan Work Order teknis otomatis.
+- **Description**: Generates recommended maintenance date, priority level, and Work Order object.
 
 ---
 
-## 🔵 2. Internal Machine Learning Service Endpoints (Port 8000)
+## 2. Internal Machine Learning Service Endpoints (Port 8000)
 > **Base URL**: `http://localhost:8000` *(FastAPI Microservice)*
 
-#### 17. Health Check
+#### 18. Health Check
 - **Method**: `GET`
 - **URL**: `http://localhost:8000/health`
 
-#### 18. Anomaly Detection + AI Advisor
+#### 19. Anomaly Detection and AI Advisor
 - **Method**: `POST`
 - **URL**: `http://localhost:8000/api/v1/ml/detect-anomaly`
 - **Body (JSON)**:
   ```json
   {
     "sensor_id": 2,
-    "device_name": "Sensor Suhu Ruangan",
+    "device_name": "Room Temperature Sensor",
     "sensor_name": "Temperature Sensor",
     "value": 92.5,
     "unit": "°C",
@@ -162,7 +179,12 @@ Panduan lengkap seluruh REST API Endpoints yang tersedia pada sistem ini untuk p
   }
   ```
 
-#### 19. Predict Telemetry Forecasting & TTV
+#### 20. Trigger Auto-Retraining Pipeline
+- **Method**: `POST`
+- **URL**: `http://localhost:8000/api/v1/ml/trigger-auto-retrain`
+- **Description**: Triggers an immediate ML model retraining cycle in the background.
+
+#### 21. Predict Telemetry Forecasting and TTV
 - **Method**: `POST`
 - **URL**: `http://localhost:8000/api/v1/ml/predict-telemetry`
 - **Body (JSON)**:
@@ -176,7 +198,7 @@ Panduan lengkap seluruh REST API Endpoints yang tersedia pada sistem ini untuk p
   }
   ```
 
-#### 20. Device Health Evaluation
+#### 22. Device Health Evaluation
 - **Method**: `POST`
 - **URL**: `http://localhost:8000/api/v1/ml/device-health`
 - **Body (JSON)**:
@@ -190,7 +212,7 @@ Panduan lengkap seluruh REST API Endpoints yang tersedia pada sistem ini untuk p
   }
   ```
 
-#### 21. RUL Prediction
+#### 23. RUL Prediction
 - **Method**: `POST`
 - **URL**: `http://localhost:8000/api/v1/ml/predict-rul`
 - **Body (JSON)**:
@@ -203,14 +225,14 @@ Panduan lengkap seluruh REST API Endpoints yang tersedia pada sistem ini untuk p
   }
   ```
 
-#### 22. Auto Maintenance Scheduler
+#### 24. Auto Maintenance Scheduler
 - **Method**: `POST`
 - **URL**: `http://localhost:8000/api/v1/ml/schedule-maintenance`
 - **Body (JSON)**:
   ```json
   {
     "sensor_id": 2,
-    "device_name": "Sensor Suhu Ruangan 1",
+    "device_name": "Room Temperature Sensor 1",
     "sensor_name": "Temperature Sensor",
     "health_score": 65.0,
     "rul_days": 12.0,
