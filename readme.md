@@ -4,6 +4,7 @@ An enterprise-grade, microservice-based centralized system for real-time IoT dev
 
 ---
 
+
 ## 1. System Architecture
 
 The project consists of three core microservices working alongside distributed database and messaging infrastructure:
